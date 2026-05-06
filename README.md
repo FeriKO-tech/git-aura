@@ -60,3 +60,7 @@ src/
 ## Notes
 
 Public GitHub API data has rate limits and some metrics are estimates. Add `GITHUB_TOKEN` in production for more stable requests.
+
+## License
+
+MIT License. See `LICENSE` for details.
