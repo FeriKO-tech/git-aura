@@ -30,13 +30,13 @@ export function AuraStage({
         background: `linear-gradient(135deg, ${preset.panelTint}, rgba(0,0,0,0.32))`,
       }}
     >
-      <div className="aura-grid pointer-events-none absolute inset-0 opacity-60" />
+      <div className="aura-grid pointer-events-none absolute inset-0 z-10 opacity-60" />
       <div className="pointer-events-none absolute inset-x-6 top-6 z-10 flex items-center justify-between text-xs uppercase tracking-[0.26em] text-white/45">
         <span>{mode.label} core</span>
         <span>{aura.energyLevel}% energy</span>
       </div>
       <div
-        className="pointer-events-none absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl"
+        className="pointer-events-none absolute left-1/2 top-1/2 z-10 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl"
         style={{
           background: aura.primaryColor,
           opacity: 0.14 + aura.glowIntensity * 0.055,
@@ -44,6 +44,7 @@ export function AuraStage({
       />
 
       <Canvas
+        className="!absolute inset-0 h-full w-full"
         camera={{ position: [0, 0, 6.2], fov: 44 }}
         dpr={[1, 1.85]}
         gl={{
@@ -96,7 +97,7 @@ export function AuraStage({
         />
       </Canvas>
 
-      <div className="pointer-events-none absolute inset-x-6 bottom-6 grid grid-cols-3 gap-3 text-center text-xs uppercase tracking-[0.18em] text-white/55">
+      <div className="pointer-events-none absolute inset-x-6 bottom-6 z-10 grid grid-cols-3 gap-3 text-center text-xs uppercase tracking-[0.18em] text-white/55">
         <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2">
           {aura.languageLabel}
         </span>
