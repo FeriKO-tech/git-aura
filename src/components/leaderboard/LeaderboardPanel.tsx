@@ -90,7 +90,7 @@ function EntryRow({
 export function LeaderboardPanel({ stats, aura }: LeaderboardPanelProps) {
   const [board, setBoard] = useState<LeaderboardResponse>(EMPTY_BOARD);
   const [status, setStatus] = useState<"idle" | "syncing" | "synced" | "error">(
-    "idle",
+    "syncing",
   );
 
   useEffect(() => {
