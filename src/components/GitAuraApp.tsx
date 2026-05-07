@@ -117,6 +117,20 @@ export function GitAuraApp({
               Commits control pulse speed, languages set the neon palette, pull
               requests spawn orbit rings, and social proof turns into glow.
             </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <a
+                href="/api/auth/github/start"
+                className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-black shadow-aura transition hover:bg-cyanAura"
+              >
+                Connect GitHub
+              </a>
+              <a
+                href="#leaderboard"
+                className="rounded-full border border-white/10 px-5 py-3 text-sm font-semibold text-white/75 transition hover:border-violetAura/60 hover:text-violetAura"
+              >
+                View leaderboard
+              </a>
+            </div>
           </div>
 
           <div className="rounded-3xl border border-white/10 bg-black/20 p-5">
@@ -230,7 +244,9 @@ export function GitAuraApp({
         </section>
 
         <AuraBattlePanel />
-        <LeaderboardPanel stats={stats} aura={aura} />
+        <div id="leaderboard">
+          <LeaderboardPanel stats={stats} aura={aura} />
+        </div>
       </div>
     </main>
   );
