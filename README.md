@@ -1,4 +1,4 @@
-# Git-Aura — GitHub Stats Visualizer
+# Git-Aura - GitHub Stats Visualizer
 
 Git-Aura turns any GitHub profile into a living 3D aura. Enter a username and the app maps public developer stats into color, pulse speed, glow, orbit rings, particles and shareable media.
 
