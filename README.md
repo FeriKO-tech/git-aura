@@ -15,7 +15,7 @@ Git-Aura turns any GitHub profile into a living 3D aura. Enter a username and th
 - Entity modes: `aura`, `crystal`, `nebula`, `void`
 - Visual presets: `cyberpunk`, `dark-fantasy`, `hologram`
 - Pull request based orbit rings
-- Commit based pulse speed
+- Yearly commit contribution based pulse speed
 - Stars/followers/repos based glow, halo and particles
 - Stats panel with language breakdown
 - Aura battle mode for comparing two GitHub profiles
@@ -28,8 +28,8 @@ Git-Aura turns any GitHub profile into a living 3D aura. Enter a username and th
 
 | GitHub stat | Aura output |
 | --- | --- |
-| Commits | Pulse speed and shader turbulence |
-| Pull requests | Orbit ring count |
+| Commit contributions, last 365 days | Pulse speed and shader turbulence |
+| Pull request contributions, last 365 days | Orbit ring count |
 | Dominant language | Primary color palette |
 | Stars | Glow intensity |
 | Followers | Halo scale |
@@ -91,6 +91,8 @@ pnpm --dir git-aura dev
 | `GITHUB_TOKEN` | Optional | Raises public GitHub API rate limits for server-side requests |
 | `UPSTASH_REDIS_REST_URL` | Optional | Enables persistent leaderboard storage |
 | `UPSTASH_REDIS_REST_TOKEN` | Optional | Upstash Redis REST token |
+
+Git-Aura uses GitHub GraphQL contribution stats for commit/PR contribution counts when a token is available, so displayed contribution metrics are scoped to the last 365 days instead of global GitHub search totals.
 
 The app works without env variables, but with limitations:
 

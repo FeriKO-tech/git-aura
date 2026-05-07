@@ -2,7 +2,9 @@ import type { GitHubStats, LanguageBreakdown } from "@/types/github";
 import { LANGUAGE_PALETTES } from "./aura-mapping";
 
 const GITHUB_API = "https://api.github.com";
+const GITHUB_GRAPHQL_API = "https://api.github.com/graphql";
 const USERNAME_RE = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$/;
+const CONTRIBUTION_WINDOW_DAYS = 365;
 
 type GitHubUserResponse = {
   login: string;
@@ -32,6 +34,30 @@ type GitHubRepoResponse = {
 
 type SearchResponse = {
   total_count: number;
+};
+
+type ContributionStats = {
+  commitCount: number;
+  pullRequestCount: number;
+  source: "graphql" | "search-fallback";
+};
+
+type ContributionsGraphQLResponse = {
+  user: {
+    contributionsCollection: {
+      totalCommitContributions: number;
+      totalPullRequestContributions: number;
+      restrictedContributionsCount: number;
+      contributionCalendar: {
+        totalContributions: number;
+      };
+    };
+  } | null;
+};
+
+type GraphQLResponse<T> = {
+  data?: T;
+  errors?: Array<{ message: string }>;
 };
 
 export class GitHubApiError extends Error {
@@ -84,6 +110,52 @@ async function githubFetch<T>(
   return response.json() as Promise<T>;
 }
 
+async function githubGraphql<T>(
+  query: string,
+  variables: Record<string, unknown>,
+  accessToken?: string,
+): Promise<T> {
+  const token = accessToken ?? process.env.GITHUB_TOKEN;
+
+  if (!token) {
+    throw new GitHubApiError(
+      "GitHub GraphQL requires GITHUB_TOKEN or OAuth token",
+      401,
+    );
+  }
+
+  const response = await fetch(GITHUB_GRAPHQL_API, {
+    method: "POST",
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "User-Agent": "git-aura",
+    },
+    body: JSON.stringify({ query, variables }),
+    next: { revalidate: 600 },
+  });
+
+  const payload = (await response.json()) as GraphQLResponse<T>;
+
+  if (!response.ok || payload.errors?.length) {
+    throw new GitHubApiError(
+      payload.errors?.map((error) => error.message).join("; ") ||
+        "GitHub GraphQL request failed",
+      response.status,
+    );
+  }
+
+  if (!payload.data) {
+    throw new GitHubApiError(
+      "GitHub GraphQL response did not include data",
+      502,
+    );
+  }
+
+  return payload.data;
+}
+
 function buildSearchPath(
   endpoint: "commits" | "issues",
   query: string,
@@ -111,6 +183,81 @@ async function searchTotal(
     accessToken,
   );
   return data.total_count;
+}
+
+function contributionWindow() {
+  const to = new Date();
+  const from = new Date(to);
+  from.setUTCDate(from.getUTCDate() - CONTRIBUTION_WINDOW_DAYS);
+
+  return {
+    from,
+    to,
+    sinceDate: from.toISOString().slice(0, 10),
+  };
+}
+
+async function fetchContributionStats(
+  login: string,
+  accessToken?: string,
+): Promise<ContributionStats> {
+  const { from, to } = contributionWindow();
+  const data = await githubGraphql<ContributionsGraphQLResponse>(
+    `query GitAuraContributions($login: String!, $from: DateTime!, $to: DateTime!) {
+      user(login: $login) {
+        contributionsCollection(from: $from, to: $to) {
+          totalCommitContributions
+          totalPullRequestContributions
+          restrictedContributionsCount
+          contributionCalendar {
+            totalContributions
+          }
+        }
+      }
+    }`,
+    {
+      login,
+      from: from.toISOString(),
+      to: to.toISOString(),
+    },
+    accessToken,
+  );
+
+  if (!data.user) {
+    throw new GitHubApiError("GitHub GraphQL user not found", 404);
+  }
+
+  return {
+    commitCount: data.user.contributionsCollection.totalCommitContributions,
+    pullRequestCount:
+      data.user.contributionsCollection.totalPullRequestContributions,
+    source: "graphql",
+  };
+}
+
+async function fetchContributionStatsFallback(
+  login: string,
+  accessToken?: string,
+): Promise<ContributionStats> {
+  const { sinceDate } = contributionWindow();
+  const [commitCount, pullRequestCount] = await Promise.all([
+    searchTotal(
+      "commits",
+      `author:${login} author-date:>=${sinceDate}`,
+      accessToken,
+    ),
+    searchTotal(
+      "issues",
+      `type:pr author:${login} created:>=${sinceDate}`,
+      accessToken,
+    ),
+  ]);
+
+  return {
+    commitCount: Math.min(commitCount, 100000),
+    pullRequestCount: Math.min(pullRequestCount, 100000),
+    source: "search-fallback",
+  };
 }
 
 async function fetchLanguageBreakdown(
@@ -230,27 +377,30 @@ export async function getGithubStats(
     );
   }
 
-  const [commitResult, pullRequestResult, languageBytes] = await Promise.all([
-    searchTotal("commits", `author:${user.login}`, accessToken).catch(
-      (error) => {
-        warnings.push(
-          error instanceof Error
-            ? error.message
-            : "Failed to fetch commit count",
-        );
-        return 0;
-      },
-    ),
-    searchTotal("issues", `type:pr author:${user.login}`, accessToken).catch(
-      (error) => {
-        warnings.push(
-          error instanceof Error
-            ? error.message
-            : "Failed to fetch pull request count",
-        );
-        return 0;
-      },
-    ),
+  const [contributionStats, languageBytes] = await Promise.all([
+    fetchContributionStats(user.login, accessToken).catch(async (error) => {
+      warnings.push(
+        error instanceof Error
+          ? `GraphQL contribution stats unavailable: ${error.message}`
+          : "GraphQL contribution stats unavailable",
+      );
+
+      return fetchContributionStatsFallback(user.login, accessToken).catch(
+        (fallbackError) => {
+          warnings.push(
+            fallbackError instanceof Error
+              ? `Search contribution fallback unavailable: ${fallbackError.message}`
+              : "Search contribution fallback unavailable",
+          );
+
+          return {
+            commitCount: 0,
+            pullRequestCount: 0,
+            source: "search-fallback" as const,
+          };
+        },
+      );
+    }),
     fetchLanguageBreakdown(repos, accessToken).catch((error) => {
       warnings.push(
         error instanceof Error
@@ -260,6 +410,12 @@ export async function getGithubStats(
       return new Map<string, number>();
     }),
   ]);
+
+  if (contributionStats.source === "search-fallback") {
+    warnings.push(
+      "Contribution counts are using capped Search API fallback for the last 365 days.",
+    );
+  }
 
   const languages = toLanguageBreakdown(languageBytes);
   const dominantLanguage = languages[0]?.name ?? "Unknown";
@@ -282,8 +438,8 @@ export async function getGithubStats(
       (sum, repo) => sum + repo.open_issues_count,
       0,
     ),
-    commitCount: commitResult,
-    pullRequestCount: pullRequestResult,
+    commitCount: contributionStats.commitCount,
+    pullRequestCount: contributionStats.pullRequestCount,
     dominantLanguage,
     languages,
     apiWarnings: warnings.slice(0, 4),

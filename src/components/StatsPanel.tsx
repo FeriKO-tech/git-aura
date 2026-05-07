@@ -27,12 +27,12 @@ function StatCard({
 export function StatsPanel({ stats, aura }: StatsPanelProps) {
   const metrics = [
     {
-      label: "commits",
+      label: "year commits",
       value: formatCompact(stats.commitCount),
       hint: `${aura.pulseSpeed}x pulse`,
     },
     {
-      label: "pull requests",
+      label: "year PRs",
       value: formatCompact(stats.pullRequestCount),
       hint: `${aura.ringCount} orbit rings`,
     },
